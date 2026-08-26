@@ -45,6 +45,20 @@
                             <a class="nav-link {{ request()->routeIs('penjual.produk.*') ? 'active' : '' }}"
                                href="{{ route('penjual.produk.index') }}">Manajemen Produk</a>
                         </li>
+                    @else
+                        <li class="nav-item">
+                            <a class="nav-link {{ request()->routeIs('keranjang.*') ? 'active' : '' }}"
+                               href="{{ route('keranjang.index') }}">
+                                Keranjang
+                                @if (count(session('keranjang', [])) > 0)
+                                    <span class="badge rounded-pill bg-primary">{{ count(session('keranjang')) }}</span>
+                                @endif
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {{ request()->routeIs('order.*') ? 'active' : '' }}"
+                               href="{{ route('order.index') }}">Pesanan Saya</a>
+                        </li>
                     @endif
                 @endauth
             </ul>

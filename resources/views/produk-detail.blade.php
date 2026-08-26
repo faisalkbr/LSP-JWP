@@ -51,6 +51,19 @@
                     <h2 class="h6">Deskripsi</h2>
                     <p class="text-muted">{{ $produk->deskripsi ?? 'Penjual belum menuliskan deskripsi produk ini.' }}</p>
 
+                    {{-- Tombol beli disembunyikan dari penjual karena keranjang hanya untuk pembeli --}}
+                    @if (! auth()->check() || auth()->user()->hasRole('pembeli'))
+                        @if ($produk->status_product === 'tersedia' && $produk->stok > 0)
+                            <form action="{{ route('keranjang.store', $produk->id_product) }}"
+                                  method="POST" class="d-inline">
+                                @csrf
+                                <button type="submit" class="btn btn-primary">Tambah ke Keranjang</button>
+                            </form>
+                        @else
+                            <button type="button" class="btn btn-primary" disabled>Stok Habis</button>
+                        @endif
+                    @endif
+
                     <a href="{{ route('landing') }}" class="btn btn-light border">Kembali ke Katalog</a>
                 </div>
             </div>

@@ -5,14 +5,17 @@
  *
  * Route dikelompokkan menurut proses pada naskah soal:
  * publik (landing & detail produk), tamu (pendaftaran & login),
- * dan area penjual (manajemen produk) yang dijaga middleware role.
+ * area pembeli (keranjang, checkout, pesanan), dan area penjual
+ * (manajemen produk). Keduanya dijaga middleware role.
  *
  * Unit kompetensi : J.620100.017.02 - Mengimplementasikan pemrograman terstruktur
  * Studi kasus     : MarketPlace Sederhana - LSP Junior Web Programmer
  */
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\KeranjangController;
 use App\Http\Controllers\LandingController;
+use App\Http\Controllers\OrderController;
 use App\Http\Controllers\Penjual\ProdukController;
 use Illuminate\Support\Facades\Route;
 
@@ -57,3 +60,21 @@ Route::middleware(['auth', 'role:penjual'])
             ->parameters(['produk' => 'id'])
             ->except(['show']);
     });
+
+/*
+ |----------------------------------------------------------------------
+ | Proses Checkout dan Order (khusus role pembeli)
+ |----------------------------------------------------------------------
+ */
+Route::middleware(['auth', 'role:pembeli'])->group(function () {
+    Route::get('/keranjang', [KeranjangController::class, 'index'])->name('keranjang.index');
+    Route::post('/keranjang/{id}', [KeranjangController::class, 'store'])->name('keranjang.store');
+    Route::put('/keranjang/{id}', [KeranjangController::class, 'update'])->name('keranjang.update');
+    Route::delete('/keranjang/{id}', [KeranjangController::class, 'destroy'])->name('keranjang.destroy');
+
+    Route::get('/checkout', [OrderController::class, 'create'])->name('checkout.create');
+    Route::post('/checkout', [OrderController::class, 'store'])->name('checkout.store');
+
+    Route::get('/pesanan', [OrderController::class, 'index'])->name('order.index');
+    Route::post('/pesanan/{id}/bukti-bayar', [OrderController::class, 'uploadBukti'])->name('order.bukti');
+});
