@@ -22,3 +22,7 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Berkas sumber Kelompok Pekerjaan 1, disimpan lokal dan tidak ikut di-commit
+/BRIEF-LSP-JWP.md
+/marketplace_lspjwp_1.sql
