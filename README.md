@@ -118,6 +118,10 @@ dan seluruhnya tanpa gambar agar penanganan gambar kosong ikut terlihat.
 ### Pembeli
 - Seluruh fitur pengunjung
 - Navbar menampilkan nama dan peran akun
+- Menambah produk ke keranjang, mengubah jumlah, dan menghapus item
+- Checkout: mengisi alamat pengiriman lalu membuat pesanan
+- Melihat riwayat pesanan beserta rinciannya
+- Mengunggah bukti pembayaran per pesanan
 - Keluar dari sistem
 - Tidak dapat membuka area penjual (ditolak middleware `role:penjual`)
 
@@ -128,6 +132,7 @@ dan seluruhnya tanpa gambar agar penanganan gambar kosong ikut terlihat.
 - Mengubah data produk; gambar lama dipertahankan bila tidak diganti
 - Menghapus produk dengan dialog konfirmasi; berkas gambarnya ikut dihapus
 - Tidak dapat melihat maupun mengubah produk milik penjual lain
+- Tidak dapat membuka area pembeli (keranjang, checkout, pesanan)
 
 ---
 
@@ -139,12 +144,17 @@ app/
     Controllers/
       LandingController.php            # landing page + detail produk
       AuthController.php               # register, login, logout
+      KeranjangController.php          # keranjang belanja berbasis session
+      OrderController.php              # checkout, riwayat pesanan, bukti bayar
       Penjual/ProdukController.php     # resource controller manajemen produk
     Middleware/EnsureRole.php          # pembatas akses berdasarkan kolom role
     Requests/
       RegisterRequest.php              # validasi pendaftaran
       LoginRequest.php                 # validasi bentuk masukan login
       ProdukRequest.php                # validasi tambah & ubah produk
+      KeranjangRequest.php             # validasi perubahan quantity
+      CheckoutRequest.php              # validasi alamat pengiriman
+      BuktiBayarRequest.php            # validasi unggahan bukti bayar
   Models/
     User.php  Produk.php  Order.php  OrderDetail.php
 database/
@@ -155,6 +165,9 @@ resources/views/
   components/badge-status.blade.php    # <x-badge-status :status="..." />
   landing.blade.php
   produk-detail.blade.php
+  checkout.blade.php
+  keranjang/index.blade.php
+  pesanan/index.blade.php
   auth/register.blade.php
   auth/login.blade.php
   penjual/produk/index.blade.php
@@ -186,6 +199,14 @@ docs/
 | GET | `/penjual/produk/{id}/edit` | `penjual.produk.edit` | Penjual |
 | PUT | `/penjual/produk/{id}` | `penjual.produk.update` | Penjual |
 | DELETE | `/penjual/produk/{id}` | `penjual.produk.destroy` | Penjual |
+| GET | `/keranjang` | `keranjang.index` | Pembeli |
+| POST | `/keranjang/{id}` | `keranjang.store` | Pembeli |
+| PUT | `/keranjang/{id}` | `keranjang.update` | Pembeli |
+| DELETE | `/keranjang/{id}` | `keranjang.destroy` | Pembeli |
+| GET | `/checkout` | `checkout.create` | Pembeli |
+| POST | `/checkout` | `checkout.store` | Pembeli |
+| GET | `/pesanan` | `order.index` | Pembeli |
+| POST | `/pesanan/{id}/bukti-bayar` | `order.bukti` | Pembeli |
 
 ---
 
@@ -212,7 +233,7 @@ Nilai ENUM:
 
 ## 10. Pengujian
 
-Pengujian manual: 25 skenario yang mencakup jalur sukses dan jalur gagal setiap
+Pengujian manual: 43 skenario yang mencakup jalur sukses dan jalur gagal setiap
 proses, terdokumentasi lengkap di [`docs/pengujian.md`](docs/pengujian.md).
 
 Pengujian otomatis:
@@ -234,21 +255,24 @@ data pengembangan di MySQL.
 - Pesan gagal login sengaja dibuat umum ("Email atau password salah") agar tidak membocorkan email mana yang terdaftar.
 - `penjual_id` diambil dari sesi login, bukan dari masukan formulir, sehingga produk tidak dapat dititipkan atas nama akun lain.
 - Aksi edit, update, dan hapus selalu memfilter `where('penjual_id', auth()->id())`; percobaan menebak URL produk milik penjual lain menghasilkan HTTP 404.
+- Pesanan hanya dapat diakses pemiliknya; `order.bukti` memfilter `where('pembeli_id', auth()->id())` sehingga pesanan pembeli lain menghasilkan HTTP 404.
+- Pembuatan pesanan dibungkus `DB::transaction()` agar tidak pernah tersimpan `orders` tanpa `order_detail`.
 - Seluruh kredensial basis data berada di `.env` dan tidak ada yang ditulis di dalam kode.
 
 ---
 
 ## 12. Ruang Lingkup yang Dikerjakan
 
-Naskah soal meminta **minimal 2 proses**. Proyek ini mengerjakan **3 proses** secara penuh:
+Naskah soal meminta **minimal 2 proses**. Proyek ini mengerjakan **4 proses** secara penuh:
 
 1. **Pendaftaran** — Landing Page dan Formulir Pendaftaran
 2. **Login / Logout** — Halaman Login beserta pengalihan sesuai peran
 3. **Manajemen Produk** — CRUD lengkap dengan unggah gambar
+4. **Checkout dan Order** — Keranjang, Checkout, dan riwayat pesanan pembeli
 
-Proses Checkout/Order dan Validasi Order **belum dikerjakan**. Tabel `orders` dan
-`order_detail` beserta model dan relasinya tetap dibuat sesuai PDM, sehingga kedua
-proses tersebut dapat ditambahkan tanpa mengubah struktur basis data.
+Proses **Validasi Order** dari sisi penjual (konfirmasi, tolak, kirim, selesai)
+belum dikerjakan. Seluruh nilai ENUM `status_order` sudah tersedia pada migrasi,
+sehingga proses tersebut dapat ditambahkan tanpa mengubah struktur basis data.
 
 ---
 
@@ -261,10 +285,11 @@ Asumsi berikut diambil secara terbuka:
 2. **"Admin" dibaca sebagai "penjual".** Sistem hanya memiliki dua peran pada kolom `role`, yaitu `pembeli` dan `penjual`; tidak ada peran admin terpisah.
 3. **Tujuan setelah login dibedakan menurut peran.** Pembeli diarahkan ke landing page, penjual ke halaman Manajemen Produk. Ini memenuhi kedua pernyataan pada naskah soal yang tampak saling bertentangan.
 4. **Tabel `order_detail` ditambahkan di luar daftar tabel pada soal.** Tanpa tabel ini, satu order tidak dapat memuat lebih dari satu produk karena quantity per produk tidak punya tempat penyimpanan.
-5. **Alamat pengiriman ditempatkan pada halaman Checkout,** bukan halaman Keranjang, mengikuti mock-up dan alur belanja yang lazim. Halaman tersebut belum diimplementasikan pada tahap ini.
-6. **Keranjang belanja direncanakan disimpan di session,** bukan tabel baru, karena naskah soal tidak mencantumkan tabel keranjang.
-7. **Tabel `sessions`, `cache`, dan `jobs` bawaan Laravel tidak dibuat.** Driver session dan cache diarahkan ke `file` agar isi basis data persis empat tabel sesuai PDM.
-8. **Kolom `remember_token` tidak ditambahkan** ke tabel `users` karena tidak ada pada PDM; fitur "ingat saya" karenanya tidak disediakan.
+5. **Alamat pengiriman ditempatkan pada halaman Checkout,** bukan halaman Keranjang, mengikuti mock-up dan alur belanja yang lazim.
+6. **Keranjang belanja disimpan di session,** bukan tabel baru, karena naskah soal tidak mencantumkan tabel keranjang. Yang disimpan hanya pasangan `id_product => quantity`; harga selalu dibaca ulang dari basis data agar keranjang lama tetap memakai harga yang berlaku.
+7. **Stok produk tidak dikurangi saat pesanan dibuat.** Naskah soal hanya meminta pembuatan baris `orders` dan `order_detail`, tidak menyebut mutasi stok. Pengurangan stok umumnya baru dilakukan setelah pembayaran dikonfirmasi penjual, yang termasuk proses Validasi Order dan belum dikerjakan. Sebagai pengaman, quantity di keranjang tetap divalidasi agar tidak melebihi stok yang tersedia.
+8. **Tabel `sessions`, `cache`, dan `jobs` bawaan Laravel tidak dibuat.** Driver session dan cache diarahkan ke `file` agar isi basis data persis empat tabel sesuai PDM.
+9. **Kolom `remember_token` tidak ditambahkan** ke tabel `users` karena tidak ada pada PDM; fitur "ingat saya" karenanya tidak disediakan.
 
 ---
 
