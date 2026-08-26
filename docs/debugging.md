@@ -41,6 +41,7 @@ apa yang benar-benar terjadi:
 | 10 | Isian harga pada form edit tampil sebagai `149000.00` di input bertipe `number` | Cast `decimal:2` pada model mengembalikan string berdesimal | Nilai ditampilkan dengan `old('harga', (int) $produk->harga)` khusus di form edit; tipe kolom di basis data tetap `DECIMAL(12,2)` | Diperbaiki |
 | 11 | Login akun berstatus `tidak_aktif` dialihkan ke landing page `/`, bukan kembali ke halaman login, sehingga pesan penolakan tidak muncul di tempat yang tepat | Helper `back()` membaca URL sebelumnya dari sesi; pemanggilan `$request->session()->invalidate()` tepat sebelumnya menghapus data tersebut sehingga `back()` jatuh ke URL default `/` | Mengganti `back()` dengan `redirect()->route('login')` pada kedua cabang kegagalan login. Diuji ulang: kedua kasus kini mengembalikan `302` ke `/login` dan pesannya tampil | Diperbaiki |
 | 12 | Risiko produk milik penjual lain terbuka lewat URL `/penjual/produk/{id}/edit` yang ditebak manual | Pencarian data yang hanya memakai `findOrFail($id)` tidak memeriksa kepemilikan baris | Seluruh aksi edit, update, dan destroy melewati satu method `cariProdukMilikPenjual()` yang menambahkan `where('penjual_id', auth()->id())`. Diuji dengan akun penjual kedua: hasilnya HTTP 404 dan produk tidak bocor ke tabel | Dicegah |
+| 13 | Kasus uji "unggah bukti bayar berupa berkas non-gambar" tampak lolos: status pesanan tidak berubah, tetapi pesan validasi yang diharapkan tidak pernah muncul di halaman | Request-nya sebenarnya tidak pernah terkirim. Berkas uji dirujuk dengan path gaya Unix (`/tmp/...`) yang tidak dikenali curl di Windows, sehingga curl berhenti sebelum mengirim dan mengembalikan kode HTTP `000` | Berkas uji dipindah ke path Windows yang sebenarnya, lalu kasus diulang. Hasilnya baru benar-benar terbukti: HTTP 302, pesan "Bukti pembayaran harus berupa berkas gambar" muncul, `status_order` tetap `menunggu_bayar`, dan `bukti_bayar` tetap NULL | Diperbaiki |
 
 ---
 
@@ -48,5 +49,5 @@ apa yang benar-benar terjadi:
 
 Setelah seluruh temuan di atas ditangani, aplikasi diuji ulang dari awal sebagai
 pengguna baru mengikuti daftar skenario pada [pengujian.md](pengujian.md).
-Seluruh 25 skenario memberikan hasil sesuai harapan dan tidak ada galat tersisa
+Seluruh 43 skenario memberikan hasil sesuai harapan dan tidak ada galat tersisa
 pada `storage/logs/laravel.log`.

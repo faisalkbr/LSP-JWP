@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Collection;
 
 class Produk extends Model
 {
@@ -55,6 +56,31 @@ class Produk extends Model
     public function orderDetail(): HasMany
     {
         return $this->hasMany(OrderDetail::class, 'product_id', 'id_product');
+    }
+
+    /**
+     * Menyusun isi keranjang belanja menjadi daftar produk beserta
+     * quantity dan subtotalnya.
+     *
+     * Harga selalu dibaca ulang dari basis data, bukan dari session, agar
+     * keranjang yang lama ditinggal tetap memakai harga yang berlaku saat ini.
+     *
+     * @param  array<int, int>  $keranjang  pasangan id_product => quantity
+     * @return Collection<int, array{produk: Produk, quantity: int, subtotal: float}>
+     */
+    public static function dariKeranjang(array $keranjang): Collection
+    {
+        if ($keranjang === []) {
+            return collect();
+        }
+
+        return static::whereIn('id_product', array_keys($keranjang))
+            ->get()
+            ->map(fn (self $produk) => [
+                'produk' => $produk,
+                'quantity' => $keranjang[$produk->id_product],
+                'subtotal' => (float) $produk->harga * $keranjang[$produk->id_product],
+            ]);
     }
 
     /**

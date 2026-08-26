@@ -65,6 +65,31 @@ Akun yang dipakai selama pengujian:
 
 ---
 
+## G. Proses Checkout dan Order (Opsional A)
+
+| No | Skenario | Input | Hasil Diharapkan | Hasil Aktual | Ket |
+|---|---|---|---|---|---|
+| 26 | Tamu membuka halaman keranjang | Belum login | Dialihkan ke halaman login | Sesuai. HTTP 302 ke `/login` | OK |
+| 27 | Keranjang masih kosong | Login sebagai pembeli, buka `/keranjang` | Muncul pesan "Keranjang Anda masih kosong" beserta tombol menuju katalog | Sesuai | OK |
+| 28 | Checkout saat keranjang kosong | Buka `/checkout` langsung | Dialihkan kembali ke keranjang dengan pesan penjelas, tidak menampilkan formulir | Sesuai. HTTP 302 ke `/keranjang` | OK |
+| 29 | Menambah dua produk ke keranjang | Klik Tambah ke Keranjang pada produk 1 dan 2 | Kedua produk muncul di keranjang, total = Rp 469.000 (149.000 + 320.000) | Sesuai | OK |
+| 30 | Menambah produk berstatus habis | Produk "Tas Ransel Laptop" (stok 0) | Ditolak dengan pesan "Produk sedang tidak tersedia", keranjang tidak berubah | Sesuai | OK |
+| 31 | Mengubah quantity | Kemeja Flanel dari 1 menjadi 3 | Subtotal dan total ikut menyesuaikan menjadi Rp 767.000 | Sesuai | OK |
+| 32 | Quantity melebihi stok | Sepatu Sneakers (stok 8) diisi 99 | Validasi menolak dengan pesan "Jumlah pesanan melebihi stok yang tersedia" | Sesuai | OK |
+| 33 | Menghapus item keranjang | Klik Hapus lalu setujui konfirmasi | Item hilang dari keranjang dan dari perhitungan total | Sesuai | OK |
+| 34 | Checkout dengan alamat terlalu singkat | alamat = "Jl A" | Validasi menolak, tidak ada baris `orders` yang tersimpan | Sesuai. `SELECT COUNT(*) FROM orders` tetap 0 | OK |
+| 35 | Checkout dengan data valid | alamat lengkap | Tersimpan 1 baris `orders` berstatus `menunggu_bayar` dan N baris `order_detail` dalam satu transaksi | Sesuai. `orders` = 1 baris Rp 447.000, `order_detail` = 1 baris qty 3 @149.000 | OK |
+| 36 | Keranjang dikosongkan setelah checkout | — | Session keranjang dibersihkan sehingga pesanan tidak terkirim dua kali | Sesuai | OK |
+| 37 | Riwayat pesanan pembeli | Buka `/pesanan` | Pesanan tampil lengkap dengan rincian produk, alamat, badge status, dan formulir unggah bukti bayar | Sesuai | OK |
+| 38 | Unggah bukti bayar berupa berkas non-gambar | berkas `.txt` | Validasi menolak dengan pesan "Bukti pembayaran harus berupa berkas gambar", status pesanan tidak berubah | Sesuai. Status tetap `menunggu_bayar`, `bukti_bayar` tetap NULL | OK |
+| 39 | Unggah bukti bayar tanpa memilih berkas | field dikosongkan | Validasi menolak dengan pesan "Berkas bukti pembayaran wajib diunggah" | Sesuai | OK |
+| 40 | Unggah bukti bayar valid | berkas PNG < 2 MB | Berkas tersimpan di `storage/app/public/bukti`, `status_order` berubah menjadi `menunggu_konfirmasi` | Sesuai. Berkas diakses lewat `/storage/bukti/...` dengan HTTP 200, badge berubah menjadi "Menunggu Konfirmasi" | OK |
+| 41 | Unggah ulang setelah status berubah | Kirim bukti kedua kali | Ditolak dengan pesan bahwa unggahan hanya berlaku untuk pesanan yang menunggu pembayaran | Sesuai | OK |
+| 42 | Penjual membuka area pembeli | Login sebagai penjual, buka `/keranjang`, `/checkout`, `/pesanan` | Ketiganya ditolak middleware `role:pembeli` dan dialihkan ke landing page | Sesuai. Ketiganya HTTP 302 ke `/` | OK |
+| 43 | Pembeli lain mengunggah bukti ke pesanan orang | POST ke `/pesanan/1/bukti-bayar` dengan akun pembeli berbeda | Menghasilkan 404, dan pesanan orang lain tidak muncul di riwayatnya | Sesuai | OK |
+
+---
+
 ## F. Pengujian Otomatis
 
 Satu feature test disertakan pada `tests/Feature/ProdukTest.php` untuk skenario
@@ -90,7 +115,7 @@ konfigurasi `phpunit.xml`, sehingga data pengembangan pada MySQL tidak terpengar
 
 ## Kesimpulan
 
-Seluruh 25 skenario pada tiga proses yang dikerjakan (Pendaftaran, Login, dan
-Manajemen Produk) memberikan hasil sesuai dengan yang diharapkan, mencakup jalur
-sukses maupun jalur gagal. Tidak ada cacat terbuka yang tersisa pada saat dokumen
+Seluruh 43 skenario pada empat proses yang dikerjakan (Pendaftaran, Login,
+Manajemen Produk, serta Checkout dan Order) memberikan hasil sesuai dengan yang
+diharapkan, mencakup jalur sukses maupun jalur gagal. Tidak ada cacat terbuka yang tersisa pada saat dokumen
 ini ditutup.
